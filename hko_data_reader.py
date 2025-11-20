@@ -25,7 +25,7 @@ class HKODailyRecord:
     """
 
     date: date
-    value: float
+    value: Optional[float]
 
     def __repr__(self) -> str:
         return f"HKODailyRecord(date={self.date}, value={self.value:.1f})"
@@ -97,15 +97,6 @@ def read_hko_daily_csv(file_path: Path) -> List[HKODailyRecord]:
 
     for idx, row in df.iterrows():
         try:
-            # Check if value is missing (NaN) or invalid
-            if pd.isna(row["value"]):
-                invalid_count += 1
-                print(
-                    f"Skipping invalid record at row {idx + 2}: "
-                    f"{int(row['year'])}-{int(row['month']):02d}-{int(row['day']):02d} - "
-                    f"Value: unavailable (***)"
-                )
-                continue
 
             # Validate date components
             year = int(row["year"])
@@ -114,6 +105,12 @@ def read_hko_daily_csv(file_path: Path) -> List[HKODailyRecord]:
 
             # Create date object (will raise ValueError if invalid date)
             record_date = date(year, month, day)
+
+            # Check if value is missing (NaN) or invalid
+            if pd.isna(row["value"]):
+                record = HKODailyRecord(date=record_date, value=None)
+
+                records.append(record)
 
             # Validate value is numeric
             value = float(row["value"])
@@ -131,29 +128,6 @@ def read_hko_daily_csv(file_path: Path) -> List[HKODailyRecord]:
                 f"Error: {e}"
             )
             continue
-
-    # Summary statistics
-    print(f"\n{'=' * 60}")
-    print("Data Loading Summary")
-    print(f"{'=' * 60}")
-    print(f"Total records processed: {len(df)}")
-    print(f"Valid records loaded: {len(records)}")
-    print(f"Invalid records skipped: {invalid_count}")
-    print(f"Success rate: {len(records) / len(df) * 100:.2f}%")
-    print(f"{'=' * 60}\n")
-
-    if records:
-        # Calculate basic statistics using numpy
-        values = np.array([r.value for r in records])
-        print("Data Statistics:")
-        print(f"  Min value: {np.min(values):.1f}")
-        print(f"  Max value: {np.max(values):.1f}")
-        print(f"  Mean value: {np.mean(values):.2f}")
-        print(f"  Std deviation: {np.std(values):.2f}")
-        print(
-            f"  Date range: {min(r.date for r in records)} to {max(r.date for r in records)}"
-        )
-        print(f"{'=' * 60}\n")
 
     return records
 
