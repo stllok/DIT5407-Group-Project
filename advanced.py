@@ -18,6 +18,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.regularizers import l2
 
 # Import the existing HKO data reader
 from hko_data_reader import HKODailyRecord, read_hko_daily_csv
@@ -85,18 +86,21 @@ def create_lstm_model(
                 activation="tanh",
                 return_sequences=True,
                 input_shape=(sequence_length, 1),
+                kernel_regularizer=l2(0.00001),
             )
         )
         model.add(Dropout(dropout_rate))
 
         # Second LSTM layer
-        model.add(LSTM(lstm_units // 2, activation="tanh"))
+        model.add(
+            LSTM(lstm_units // 2, activation="tanh", kernel_regularizer=l2(0.00001))
+        )
         model.add(Dropout(dropout_rate))
 
     # Output layer for regression
     model.add(Dense(1))
 
-    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse", metrics=["mae"])
+    model.compile(optimizer=Adam(learning_rate=0.0001), loss="mse", metrics=["mae"])
 
     return model
 
@@ -289,12 +293,12 @@ def main():
 
     # Configuration
     SEQUENCE_LENGTH = 30  # Use 30 days to predict next day
-    LSTM_UNITS = 64  # Number of LSTM units (within 50-100 range)
+    LSTM_UNITS = 100  # Number of LSTM units (within 50-100 range)
     NUM_LAYERS = 2  # Number of LSTM layers (1-2)
-    DROPOUT_RATE = 0.2  # Dropout rate for regularization
+    DROPOUT_RATE = 0  # Dropout rate for regularization
     MISSING_VALUE_METHOD = "interpolate"  # 'forward_fill' or 'interpolate'
-    EPOCHS = 50
-    BATCH_SIZE = 32
+    EPOCHS = 100
+    BATCH_SIZE = 16
 
     # Load data
     print("\n1. Loading HKO data...")
@@ -327,16 +331,43 @@ def main():
 
     # Prepare sequences
     print(f"\n3. Preparing sequences (sequence length: {SEQUENCE_LENGTH})...")
-    X_train, y_train = prepare_sequences(temperature_series.values, sequence_length=SEQUENCE_LENGTH)
-    X_val, y_val = prepare_sequences(validate_temperature_series.values, sequence_length=SEQUENCE_LENGTH)
+    X_train, y_train = prepare_sequences(
+        temperature_series.values, sequence_length=SEQUENCE_LENGTH
+    )
+    X_val, y_val = prepare_sequences(
+        validate_temperature_series.values, sequence_length=SEQUENCE_LENGTH
+    )
     print(f"   Training sequences: {len(X_train)} samples")
     print(f"   Validation sequences: {len(X_val)} samples")
 
     # Normalize data using training data's scaler
     print("\n4. Normalizing data...")
     scaler = MinMaxScaler()
-    y_train_scaled = scaler.fit_transform(y_train.reshape(-1, 1)).flatten()
-    y_val_scaled = scaler.transform(y_val.reshape(-1, 1)).flatten()
+    # Fit scaler on the full training temperature series and transform the data before creating sequences
+    scaled_temperature_values = scaler.fit_transform(
+        temperature_series.values.reshape(-1, 1)
+    ).flatten()
+
+    # Apply the same transformation to validation data
+    scaled_validate_values = scaler.transform(
+        validate_temperature_series.values.reshape(-1, 1)
+    ).flatten()
+
+    # Now create sequences using the scaled values
+    X_train_scaled, y_train_scaled = prepare_sequences(
+        scaled_temperature_values, sequence_length=SEQUENCE_LENGTH
+    )
+    X_val_scaled, y_val_scaled = prepare_sequences(
+        scaled_validate_values, sequence_length=SEQUENCE_LENGTH
+    )
+
+    # Reshape X to have shape (samples, sequence_length, 1) for LSTM
+    X_train_scaled = X_train_scaled.reshape(
+        (X_train_scaled.shape[0], X_train_scaled.shape[1], 1)
+    )
+    X_val_scaled = X_val_scaled.reshape(
+        (X_val_scaled.shape[0], X_val_scaled.shape[1], 1)
+    )
 
     # Create and train model
     print(
@@ -363,18 +394,18 @@ def main():
         verbose=1,
         factor=0.5,
         # LR降為0.5
-        min_lr=0.0000001,
-        # 最小 LR 到0.0000001就不再下降
+        min_lr=0.000000001,
+        # 最小 LR 到0.000000001就不再下降
         mode="min",
     )
 
     print(f"\n6. Training model for {EPOCHS} epochs...")
     history = model.fit(
-        X_train,
+        X_train_scaled,
         y_train_scaled,
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
-        validation_data=(X_val, y_val_scaled),  # Using validation dataset
+        validation_data=(X_val_scaled, y_val_scaled),  # Using validation dataset
         callbacks=[early_stopping, reduce_lr],
         verbose=1,
     )
@@ -406,10 +437,15 @@ def main():
 
     plot_training_history(history)
 
-    # Save model
+    # Save model and scaler
+    import joblib
+
     model_path = "figures/advanced_lstm_model.keras"
+    scaler_path = "figures/advanced_lstm_scaler.pkl"
     model.save(model_path)
+    joblib.dump(scaler, scaler_path)
     print(f"\n10. Model saved to: {model_path}")
+    print(f"    Scaler saved to: {scaler_path}")
 
     print("\n=== Training Complete ===")
     print(f"Final RMSE on Validation: {rmse:.3f}°C")

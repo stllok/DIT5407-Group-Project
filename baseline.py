@@ -77,7 +77,7 @@ def create_rnn_model(sequence_length: int = 30, units: int = 64) -> tf.keras.Mod
         ]
     )
 
-    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse", metrics=["mae"])
+    model.compile(optimizer=Adam(learning_rate=0.0001), loss="mse", metrics=["mae"])
 
     return model
 
@@ -222,10 +222,10 @@ def main():
 
     # Configuration
     SEQUENCE_LENGTH = 30  # Use 30 days to predict next day
-    RNN_UNITS = 64  # Number of RNN units (within 50-100 range)
+    RNN_UNITS = 100  # Number of RNN units (within 50-100 range)
     MISSING_VALUE_METHOD = "interpolate"  # 'forward_fill' or 'interpolate'
     EPOCHS = 50
-    BATCH_SIZE = 32
+    BATCH_SIZE = 16
 
     # Load data
     print("\n1. Loading HKO data...")
@@ -270,8 +270,31 @@ def main():
     # Normalize data using training data's scaler
     print("\n4. Normalizing data...")
     scaler = MinMaxScaler()
-    y_train_scaled = scaler.fit_transform(y_train.reshape(-1, 1)).flatten()
-    y_val_scaled = scaler.transform(y_val.reshape(-1, 1)).flatten()
+    # Fit scaler on the full training temperature series and transform the data before creating sequences
+    scaled_temperature_values = scaler.fit_transform(
+        temperature_series.values.reshape(-1, 1)
+    ).flatten()
+
+    # Apply the same transformation to validation data
+    scaled_validate_values = scaler.transform(
+        validate_temperature_series.values.reshape(-1, 1)
+    ).flatten()
+
+    # Now create sequences using the scaled values
+    X_train_scaled, y_train_scaled = prepare_sequences(
+        scaled_temperature_values, sequence_length=SEQUENCE_LENGTH
+    )
+    X_val_scaled, y_val_scaled = prepare_sequences(
+        scaled_validate_values, sequence_length=SEQUENCE_LENGTH
+    )
+
+    # Reshape X to have shape (samples, sequence_length, 1) for LSTM
+    X_train_scaled = X_train_scaled.reshape(
+        (X_train_scaled.shape[0], X_train_scaled.shape[1], 1)
+    )
+    X_val_scaled = X_val_scaled.reshape(
+        (X_val_scaled.shape[0], X_val_scaled.shape[1], 1)
+    )
 
     # Create and train model
     print(f"\n5. Creating RNN model ({RNN_UNITS} units)...")
@@ -293,11 +316,11 @@ def main():
         mode="min",
     )
     history = model.fit(
-        X_train,
+        X_train_scaled,
         y_train_scaled,
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
-        validation_data=(X_val, y_val_scaled),  # Using validation dataset
+        validation_data=(X_val_scaled, y_val_scaled),  # Using validation dataset
         callbacks=[reduce_lr],
         verbose=1,
     )
@@ -327,10 +350,15 @@ def main():
     errors = y_val_original - y_pred
     plot_error_distribution(errors)
 
-    # Save model
+    # Save model and scaler
+    import joblib
+
     model_path = "figures/baseline_rnn_model.keras"
+    scaler_path = "figures/baseline_rnn_scaler.pkl"
     model.save(model_path)
+    joblib.dump(scaler, scaler_path)
     print(f"\n10. Model saved to: {model_path}")
+    print(f"    Scaler saved to: {scaler_path}")
 
     print("\n=== Training Complete ===")
     print(f"Final RMSE on Validation: {rmse:.3f}°C")
