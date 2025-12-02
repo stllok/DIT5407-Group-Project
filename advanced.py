@@ -196,16 +196,6 @@ def plot_results(
     plt.legend()
     plt.grid(True, alpha=0.3)
 
-    # Plot residuals
-    plt.subplot(1, 3, 3)
-    residuals = y_true - y_pred
-    plt.scatter(range(len(residuals)), residuals, alpha=0.6)
-    plt.axhline(y=0, color="r", linestyle="--")
-    plt.xlabel("Time Steps")
-    plt.ylabel("Residuals (°C)")
-    plt.title(f"{title} - Residuals")
-    plt.grid(True, alpha=0.3)
-
     plt.tight_layout()
     plt.savefig(
         "figures/advanced_lstm_pred_vs_actual.png", dpi=300, bbox_inches="tight"
@@ -385,10 +375,10 @@ def main():
 
     # Setup callbacks
     early_stopping = EarlyStopping(
-        monitor="val_loss", patience=10, restore_best_weights=True
+        monitor="val_mae", patience=10, restore_best_weights=True
     )
     reduce_lr = ReduceLROnPlateau(
-        monitor="val_loss",
+        monitor="val_mae",
         patience=3,
         # 3 epochs 內acc沒下降就要調整LR
         verbose=1,
@@ -412,7 +402,7 @@ def main():
 
     # Make predictions on validation set
     print("\n7. Making predictions on validation data...")
-    y_pred_scaled = model.predict(X_val, verbose=0)
+    y_pred_scaled = model.predict(X_val_scaled, verbose=0)
 
     # Inverse transform predictions
     y_pred = scaler.inverse_transform(y_pred_scaled).flatten()

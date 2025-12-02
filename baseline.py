@@ -305,7 +305,7 @@ def main():
 
     print(f"\n6. Training model for {EPOCHS} epochs...")
     reduce_lr = ReduceLROnPlateau(
-        monitor="val_loss",
+        monitor="val_mae",
         patience=3,
         # 3 epochs 內acc沒下降就要調整LR
         verbose=1,
@@ -327,7 +327,7 @@ def main():
 
     # Make predictions on validation set
     print("\n7. Making predictions on validation data...")
-    y_pred_scaled = model.predict(X_val, verbose=0)
+    y_pred_scaled = model.predict(X_val_scaled, verbose=0)
 
     # Inverse transform predictions
     y_pred = scaler.inverse_transform(y_pred_scaled).flatten()
