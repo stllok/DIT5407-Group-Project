@@ -77,7 +77,7 @@ def create_rnn_model(sequence_length: int = 30, units: int = 64) -> tf.keras.Mod
         ]
     )
 
-    model.compile(optimizer=Adam(learning_rate=0.0001), loss="mse", metrics=["mae"])
+    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse", metrics=["mae"])
 
     return model
 
@@ -225,7 +225,7 @@ def main():
     RNN_UNITS = 100  # Number of RNN units (within 50-100 range)
     MISSING_VALUE_METHOD = "interpolate"  # 'forward_fill' or 'interpolate'
     EPOCHS = 50
-    BATCH_SIZE = 16
+    BATCH_SIZE = 128
 
     # Load data
     print("\n1. Loading HKO data...")

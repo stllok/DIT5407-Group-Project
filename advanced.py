@@ -18,7 +18,6 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.regularizers import l2
 
 # Import the existing HKO data reader
 from hko_data_reader import HKODailyRecord, read_hko_daily_csv
@@ -86,21 +85,18 @@ def create_lstm_model(
                 activation="tanh",
                 return_sequences=True,
                 input_shape=(sequence_length, 1),
-                kernel_regularizer=l2(0.00001),
             )
         )
         model.add(Dropout(dropout_rate))
 
         # Second LSTM layer
-        model.add(
-            LSTM(lstm_units // 2, activation="tanh", kernel_regularizer=l2(0.00001))
-        )
+        model.add(LSTM(lstm_units // 2, activation="tanh"))
         model.add(Dropout(dropout_rate))
 
     # Output layer for regression
     model.add(Dense(1))
 
-    model.compile(optimizer=Adam(learning_rate=0.0001), loss="mse", metrics=["mae"])
+    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse", metrics=["mae"])
 
     return model
 
@@ -285,10 +281,10 @@ def main():
     SEQUENCE_LENGTH = 30  # Use 30 days to predict next day
     LSTM_UNITS = 100  # Number of LSTM units (within 50-100 range)
     NUM_LAYERS = 2  # Number of LSTM layers (1-2)
-    DROPOUT_RATE = 0  # Dropout rate for regularization
+    DROPOUT_RATE = 0.2  # Dropout rate for regularization
     MISSING_VALUE_METHOD = "interpolate"  # 'forward_fill' or 'interpolate'
     EPOCHS = 100
-    BATCH_SIZE = 16
+    BATCH_SIZE = 32
 
     # Load data
     print("\n1. Loading HKO data...")
