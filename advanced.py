@@ -96,7 +96,7 @@ def create_lstm_model(
     # Output layer for regression
     model.add(Dense(1))
 
-    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse", metrics=["mae"])
+    model.compile(optimizer=Adam(learning_rate=0.05), loss="mse", metrics=["mae"])
 
     return model
 
@@ -281,7 +281,7 @@ def main():
     SEQUENCE_LENGTH = 30  # Use 30 days to predict next day
     LSTM_UNITS = 100  # Number of LSTM units (within 50-100 range)
     NUM_LAYERS = 2  # Number of LSTM layers (1-2)
-    DROPOUT_RATE = 0.2  # Dropout rate for regularization
+    DROPOUT_RATE = 0.1  # Dropout rate for regularization
     MISSING_VALUE_METHOD = "interpolate"  # 'forward_fill' or 'interpolate'
     EPOCHS = 100
     BATCH_SIZE = 32

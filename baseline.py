@@ -77,7 +77,7 @@ def create_rnn_model(sequence_length: int = 30, units: int = 64) -> tf.keras.Mod
         ]
     )
 
-    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse", metrics=["mae"])
+    model.compile(optimizer=Adam(learning_rate=0.005), loss="mse", metrics=["mae"])
 
     return model
 
